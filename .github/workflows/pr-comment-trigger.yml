@@ -37,6 +37,7 @@ on:
 
 jobs:
   debug:
+    runs-on: [linux]
     steps:
       - name: Debug
         run: |
@@ -49,6 +50,7 @@ jobs:
     if: ${{ (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.author_association == 'CONTRIBUTOR' ) &&
             github.event.issue.pull_request &&
             contains(github.event.comment.body, inputs.trigger-keyword ) }}
+    runs-on: [linux]
     outputs:
       example_list: ${{ steps.get-example-list-name.outputs.example-list }}
       example_hash: ${{ steps.get-example-list-name.outputs.example-hash }}
@@ -105,6 +107,7 @@ jobs:
     if: ${{ (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.author_association == 'CONTRIBUTOR' ) &&
       github.event.issue.pull_request &&
       contains(github.event.comment.body, inputs.trigger-keyword ) }}
+    runs-on: [linux]
     needs: get-example-list
 
     steps:
