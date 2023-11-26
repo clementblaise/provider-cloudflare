@@ -6,7 +6,7 @@ on:
 
 jobs:
   e2e:
-    uses: ./.github/workflows/my-pr-comment-trigger.yml
+    uses: ./.github/workflows/pr-comment-trigger.yml
     secrets:
       UPTEST_CLOUD_CREDENTIALS: ${{ secrets.UPTEST_CLOUD_CREDENTIALS }}
       UPTEST_DATASOURCE: ${{ secrets.UPTEST_DATASOURCE }}
