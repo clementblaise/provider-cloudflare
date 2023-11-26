@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: organizations.access.cloudflare.upbound.io
 spec:
   group: access.cloudflare.upbound.io
@@ -54,9 +53,13 @@ spec:
             properties:
               deletionPolicy:
                 default: Delete
-                description: DeletionPolicy specifies what will happen to the underlying
+                description: 'DeletionPolicy specifies what will happen to the underlying
                   external when this managed resource is deleted - either "Delete"
-                  or "Orphan" the external resource.
+                  or "Orphan" the external resource. This field is planned to be deprecated
+                  in favor of the ManagementPolicies field in a future release. Currently,
+                  both could be set independently and non-default values would be
+                  honored if the feature flag is enabled. See the design doc for more
+                  information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223'
                 enum:
                 - Orphan
                 - Delete
@@ -144,6 +147,22 @@ spec:
                     description: The unique subdomain assigned to your Zero Trust
                       organization.
                     type: string
+                  autoRedirectToIdentity:
+                    description: When set to true, users skip the identity provider
+                      selection step during login.
+                    type: boolean
+                  customPages:
+                    description: Custom pages for your Zero Trust organization.
+                    items:
+                      properties:
+                        forbidden:
+                          description: The id of the forbidden page.
+                          type: string
+                        identityDenied:
+                          description: The id of the identity denied page.
+                          type: string
+                      type: object
+                    type: array
                   isUiReadOnly:
                     description: When set to true, this will disable all editing of
                       Access resources via the Zero Trust Dashboard.
@@ -170,6 +189,20 @@ spec:
                     type: array
                   name:
                     description: The name of your Zero Trust organization.
+                    type: string
+                  sessionDuration:
+                    description: How often a user will be forced to re-authorise.
+                      Must be in the format `48h` or `2h45m`. Defaults to `24h`.
+                    type: string
+                  uiReadOnlyToggleReason:
+                    description: A description of the reason why the UI read only
+                      field is being toggled.
+                    type: string
+                  userSeatExpirationInactiveTime:
+                    description: The amount of time a user seat is inactive before
+                      it expires. When the user seat exceeds the set time of inactivity,
+                      the user is removed as an active seat and no longer counts against
+                      your Teams seat count. Must be in the format `300ms` or `2h45m`.
                     type: string
                   zoneId:
                     description: The zone identifier to target for the resource. Conflicts
@@ -248,9 +281,108 @@ spec:
                             type: string
                         type: object
                     type: object
-                required:
-                - authDomain
                 type: object
+              initProvider:
+                description: THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. InitProvider
+                  holds the same fields as ForProvider, with the exception of Identifier
+                  and other resource reference fields. The fields that are in InitProvider
+                  are merged into ForProvider when the resource is created. The same
+                  fields are also added to the terraform ignore_changes hook, to avoid
+                  updating them after creation. This is useful for fields that are
+                  required on creation, but we do not desire to update them after
+                  creation, for example because of an external controller is managing
+                  them, like an autoscaler.
+                properties:
+                  authDomain:
+                    description: The unique subdomain assigned to your Zero Trust
+                      organization.
+                    type: string
+                  autoRedirectToIdentity:
+                    description: When set to true, users skip the identity provider
+                      selection step during login.
+                    type: boolean
+                  customPages:
+                    description: Custom pages for your Zero Trust organization.
+                    items:
+                      properties:
+                        forbidden:
+                          description: The id of the forbidden page.
+                          type: string
+                        identityDenied:
+                          description: The id of the identity denied page.
+                          type: string
+                      type: object
+                    type: array
+                  isUiReadOnly:
+                    description: When set to true, this will disable all editing of
+                      Access resources via the Zero Trust Dashboard.
+                    type: boolean
+                  loginDesign:
+                    items:
+                      properties:
+                        backgroundColor:
+                          description: The background color on the login page.
+                          type: string
+                        footerText:
+                          description: The text at the bottom of the login page.
+                          type: string
+                        headerText:
+                          description: The text at the top of the login page.
+                          type: string
+                        logoPath:
+                          description: The URL of the logo on the login page.
+                          type: string
+                        textColor:
+                          description: The text color on the login page.
+                          type: string
+                      type: object
+                    type: array
+                  name:
+                    description: The name of your Zero Trust organization.
+                    type: string
+                  sessionDuration:
+                    description: How often a user will be forced to re-authorise.
+                      Must be in the format `48h` or `2h45m`. Defaults to `24h`.
+                    type: string
+                  uiReadOnlyToggleReason:
+                    description: A description of the reason why the UI read only
+                      field is being toggled.
+                    type: string
+                  userSeatExpirationInactiveTime:
+                    description: The amount of time a user seat is inactive before
+                      it expires. When the user seat exceeds the set time of inactivity,
+                      the user is removed as an active seat and no longer counts against
+                      your Teams seat count. Must be in the format `300ms` or `2h45m`.
+                    type: string
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: 'THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. ManagementPolicies
+                  specify the array of actions Crossplane is allowed to take on the
+                  managed and external resources. This field is planned to replace
+                  the DeletionPolicy field in a future release. Currently, both could
+                  be set independently and non-default values would be honored if
+                  the feature flag is enabled. If both are custom, the DeletionPolicy
+                  field will be ignored. See the design doc for more information:
+                  https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md'
+                items:
+                  description: A ManagementAction represents an action that the Crossplane
+                    controllers can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
               providerConfigRef:
                 default:
                   name: default
@@ -422,12 +554,86 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: authDomain is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.authDomain)
+                || has(self.initProvider.authDomain)'
           status:
             description: OrganizationStatus defines the observed state of Organization.
             properties:
               atProvider:
                 properties:
+                  accountId:
+                    description: The account identifier to target for the resource.
+                      Conflicts with `zone_id`.
+                    type: string
+                  authDomain:
+                    description: The unique subdomain assigned to your Zero Trust
+                      organization.
+                    type: string
+                  autoRedirectToIdentity:
+                    description: When set to true, users skip the identity provider
+                      selection step during login.
+                    type: boolean
+                  customPages:
+                    description: Custom pages for your Zero Trust organization.
+                    items:
+                      properties:
+                        forbidden:
+                          description: The id of the forbidden page.
+                          type: string
+                        identityDenied:
+                          description: The id of the identity denied page.
+                          type: string
+                      type: object
+                    type: array
                   id:
+                    type: string
+                  isUiReadOnly:
+                    description: When set to true, this will disable all editing of
+                      Access resources via the Zero Trust Dashboard.
+                    type: boolean
+                  loginDesign:
+                    items:
+                      properties:
+                        backgroundColor:
+                          description: The background color on the login page.
+                          type: string
+                        footerText:
+                          description: The text at the bottom of the login page.
+                          type: string
+                        headerText:
+                          description: The text at the top of the login page.
+                          type: string
+                        logoPath:
+                          description: The URL of the logo on the login page.
+                          type: string
+                        textColor:
+                          description: The text color on the login page.
+                          type: string
+                      type: object
+                    type: array
+                  name:
+                    description: The name of your Zero Trust organization.
+                    type: string
+                  sessionDuration:
+                    description: How often a user will be forced to re-authorise.
+                      Must be in the format `48h` or `2h45m`. Defaults to `24h`.
+                    type: string
+                  uiReadOnlyToggleReason:
+                    description: A description of the reason why the UI read only
+                      field is being toggled.
+                    type: string
+                  userSeatExpirationInactiveTime:
+                    description: The amount of time a user seat is inactive before
+                      it expires. When the user seat exceeds the set time of inactivity,
+                      the user is removed as an active seat and no longer counts against
+                      your Teams seat count. Must be in the format `300ms` or `2h45m`.
+                    type: string
+                  zoneId:
+                    description: The zone identifier to target for the resource. Conflicts
+                      with `account_id`.
                     type: string
                 type: object
               conditions:
@@ -471,9 +677,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

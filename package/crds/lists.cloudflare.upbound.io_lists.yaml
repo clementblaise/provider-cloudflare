@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: lists.lists.cloudflare.upbound.io
 spec:
   group: lists.cloudflare.upbound.io
@@ -54,9 +53,13 @@ spec:
             properties:
               deletionPolicy:
                 default: Delete
-                description: DeletionPolicy specifies what will happen to the underlying
+                description: 'DeletionPolicy specifies what will happen to the underlying
                   external when this managed resource is deleted - either "Delete"
-                  or "Orphan" the external resource.
+                  or "Orphan" the external resource. This field is planned to be deprecated
+                  in favor of the ManagementPolicies field in a future release. Currently,
+                  both could be set independently and non-default values would be
+                  honored if the feature flag is enabled. See the design doc for more
+                  information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223'
                 enum:
                 - Orphan
                 - Delete
@@ -151,6 +154,17 @@ spec:
                         value:
                           items:
                             properties:
+                              asn:
+                                type: number
+                              hostname:
+                                items:
+                                  properties:
+                                    urlHostname:
+                                      description: The FQDN to match on. Wildcard
+                                        sub-domain matching is allowed. Eg. *.abc.com.
+                                      type: string
+                                  type: object
+                                type: array
                               ip:
                                 type: string
                               redirect:
@@ -186,28 +200,135 @@ spec:
                                     targetUrl:
                                       description: The target url of the redirect.
                                       type: string
-                                  required:
-                                  - sourceUrl
-                                  - targetUrl
                                   type: object
                                 type: array
                             type: object
                           type: array
-                      required:
-                      - value
                       type: object
                     type: array
                   kind:
-                    description: The type of items the list will contain.
+                    description: 'The type of items the list will contain. Available
+                      values: `ip`, `redirect`, `hostname`, `asn`. **Modifying this
+                      attribute will force creation of a new resource.**'
                     type: string
                   name:
                     description: The name of the list. **Modifying this attribute
                       will force creation of a new resource.**
                     type: string
-                required:
-                - kind
-                - name
                 type: object
+              initProvider:
+                description: THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. InitProvider
+                  holds the same fields as ForProvider, with the exception of Identifier
+                  and other resource reference fields. The fields that are in InitProvider
+                  are merged into ForProvider when the resource is created. The same
+                  fields are also added to the terraform ignore_changes hook, to avoid
+                  updating them after creation. This is useful for fields that are
+                  required on creation, but we do not desire to update them after
+                  creation, for example because of an external controller is managing
+                  them, like an autoscaler.
+                properties:
+                  description:
+                    description: An optional description of the list.
+                    type: string
+                  item:
+                    items:
+                      properties:
+                        comment:
+                          description: An optional comment for the item.
+                          type: string
+                        value:
+                          items:
+                            properties:
+                              asn:
+                                type: number
+                              hostname:
+                                items:
+                                  properties:
+                                    urlHostname:
+                                      description: The FQDN to match on. Wildcard
+                                        sub-domain matching is allowed. Eg. *.abc.com.
+                                      type: string
+                                  type: object
+                                type: array
+                              ip:
+                                type: string
+                              redirect:
+                                items:
+                                  properties:
+                                    includeSubdomains:
+                                      description: 'Whether the redirect also matches
+                                        subdomains of the source url. Available values:
+                                        `disabled`, `enabled`.'
+                                      type: string
+                                    preservePathSuffix:
+                                      description: 'Whether to preserve the path suffix
+                                        when doing subpath matching. Available values:
+                                        `disabled`, `enabled`.'
+                                      type: string
+                                    preserveQueryString:
+                                      description: 'Whether the redirect target url
+                                        should keep the query string of the request''s
+                                        url. Available values: `disabled`, `enabled`.'
+                                      type: string
+                                    sourceUrl:
+                                      description: The source url of the redirect.
+                                      type: string
+                                    statusCode:
+                                      description: The status code to be used when
+                                        redirecting a request.
+                                      type: number
+                                    subpathMatching:
+                                      description: 'Whether the redirect also matches
+                                        subpaths of the source url. Available values:
+                                        `disabled`, `enabled`.'
+                                      type: string
+                                    targetUrl:
+                                      description: The target url of the redirect.
+                                      type: string
+                                  type: object
+                                type: array
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  kind:
+                    description: 'The type of items the list will contain. Available
+                      values: `ip`, `redirect`, `hostname`, `asn`. **Modifying this
+                      attribute will force creation of a new resource.**'
+                    type: string
+                  name:
+                    description: The name of the list. **Modifying this attribute
+                      will force creation of a new resource.**
+                    type: string
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: 'THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. ManagementPolicies
+                  specify the array of actions Crossplane is allowed to take on the
+                  managed and external resources. This field is planned to replace
+                  the DeletionPolicy field in a future release. Currently, both could
+                  be set independently and non-default values would be honored if
+                  the feature flag is enabled. If both are custom, the DeletionPolicy
+                  field will be ignored. See the design doc for more information:
+                  https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md'
+                items:
+                  description: A ManagementAction represents an action that the Crossplane
+                    controllers can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
               providerConfigRef:
                 default:
                   name: default
@@ -379,12 +500,97 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: kind is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.kind)
+                || has(self.initProvider.kind)'
+            - message: name is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.name)
+                || has(self.initProvider.name)'
           status:
             description: ListStatus defines the observed state of List.
             properties:
               atProvider:
                 properties:
+                  accountId:
+                    description: The account identifier to target for the resource.
+                    type: string
+                  description:
+                    description: An optional description of the list.
+                    type: string
                   id:
+                    type: string
+                  item:
+                    items:
+                      properties:
+                        comment:
+                          description: An optional comment for the item.
+                          type: string
+                        value:
+                          items:
+                            properties:
+                              asn:
+                                type: number
+                              hostname:
+                                items:
+                                  properties:
+                                    urlHostname:
+                                      description: The FQDN to match on. Wildcard
+                                        sub-domain matching is allowed. Eg. *.abc.com.
+                                      type: string
+                                  type: object
+                                type: array
+                              ip:
+                                type: string
+                              redirect:
+                                items:
+                                  properties:
+                                    includeSubdomains:
+                                      description: 'Whether the redirect also matches
+                                        subdomains of the source url. Available values:
+                                        `disabled`, `enabled`.'
+                                      type: string
+                                    preservePathSuffix:
+                                      description: 'Whether to preserve the path suffix
+                                        when doing subpath matching. Available values:
+                                        `disabled`, `enabled`.'
+                                      type: string
+                                    preserveQueryString:
+                                      description: 'Whether the redirect target url
+                                        should keep the query string of the request''s
+                                        url. Available values: `disabled`, `enabled`.'
+                                      type: string
+                                    sourceUrl:
+                                      description: The source url of the redirect.
+                                      type: string
+                                    statusCode:
+                                      description: The status code to be used when
+                                        redirecting a request.
+                                      type: number
+                                    subpathMatching:
+                                      description: 'Whether the redirect also matches
+                                        subpaths of the source url. Available values:
+                                        `disabled`, `enabled`.'
+                                      type: string
+                                    targetUrl:
+                                      description: The target url of the redirect.
+                                      type: string
+                                  type: object
+                                type: array
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  kind:
+                    description: 'The type of items the list will contain. Available
+                      values: `ip`, `redirect`, `hostname`, `asn`. **Modifying this
+                      attribute will force creation of a new resource.**'
+                    type: string
+                  name:
+                    description: The name of the list. **Modifying this attribute
+                      will force creation of a new resource.**
                     type: string
                 type: object
               conditions:
@@ -428,9 +634,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

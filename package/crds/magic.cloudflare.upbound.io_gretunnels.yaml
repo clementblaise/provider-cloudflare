@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: gretunnels.magic.cloudflare.upbound.io
 spec:
   group: magic.cloudflare.upbound.io
@@ -35,7 +34,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: GRETunnel is the Schema for the GRETunnels API. <no value>
+        description: GRETunnel is the Schema for the GRETunnels API. Provides a resource
+          which manages GRE tunnels for Magic Transit.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -54,9 +54,13 @@ spec:
             properties:
               deletionPolicy:
                 default: Delete
-                description: DeletionPolicy specifies what will happen to the underlying
+                description: 'DeletionPolicy specifies what will happen to the underlying
                   external when this managed resource is deleted - either "Delete"
-                  or "Orphan" the external resource.
+                  or "Orphan" the external resource. This field is planned to be deprecated
+                  in favor of the ManagementPolicies field in a future release. Currently,
+                  both could be set independently and non-default values would be
+                  honored if the feature flag is enabled. See the design doc for more
+                  information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223'
                 enum:
                 - Orphan
                 - Delete
@@ -64,8 +68,9 @@ spec:
               forProvider:
                 properties:
                   accountId:
-                    description: The account identifier to target for the resource.
-                      **Modifying this attribute will force creation of a new resource.**
+                    description: The ID of the account where the tunnel is being created.
+                      The account identifier to target for the resource. **Modifying
+                      this attribute will force creation of a new resource.**
                     type: string
                   accountIdRef:
                     description: Reference to a Account in account to populate accountId.
@@ -141,31 +146,142 @@ spec:
                         type: object
                     type: object
                   cloudflareGreEndpoint:
+                    description: The IP address assigned to the Cloudflare side of
+                      the GRE tunnel. The IP address assigned to the Cloudflare side
+                      of the GRE tunnel.
                     type: string
                   customerGreEndpoint:
+                    description: The IP address assigned to the customer side of the
+                      GRE tunnel. The IP address assigned to the customer side of
+                      the GRE tunnel.
                     type: string
                   description:
+                    description: An optional description of the GRE tunnel. Description
+                      of the GRE tunnel intent.
                     type: string
                   healthCheckEnabled:
+                    description: 'Specifies if ICMP tunnel health checks are enabled
+                      Default: true. Specifies if ICMP tunnel health checks are enabled.'
                     type: boolean
                   healthCheckTarget:
+                    description: 'The IP address of the customer endpoint that will
+                      receive tunnel health checks. Default: <customer_gre_endpoint>.
+                      The IP address of the customer endpoint that will receive tunnel
+                      health checks.'
                     type: string
                   healthCheckType:
+                    description: 'Specifies the ICMP echo type for the health check
+                      (request or reply) Default: reply. Specifies the ICMP echo type
+                      for the health check. Available values: `request`, `reply`.'
                     type: string
                   interfaceAddress:
+                    description: 31-bit prefix (/31 in CIDR notation) supporting 2
+                      hosts, one for each side of the tunnel. 31-bit prefix (/31 in
+                      CIDR notation) supporting 2 hosts, one for each side of the
+                      tunnel.
                     type: string
                   mtu:
+                    description: 'Maximum Transmission Unit (MTU) in bytes for the
+                      GRE tunnel. Maximum value 1476 and minimum value 576. Default:
+                      1476. Maximum Transmission Unit (MTU) in bytes for the GRE tunnel.'
                     type: number
                   name:
+                    description: Name of the GRE tunnel. Name of the GRE tunnel.
                     type: string
                   ttl:
+                    description: 'Time To Live (TTL) in number of hops of the GRE
+                      tunnel. Minimum value 64. Default: 64. Time To Live (TTL) in
+                      number of hops of the GRE tunnel.'
                     type: number
-                required:
-                - cloudflareGreEndpoint
-                - customerGreEndpoint
-                - interfaceAddress
-                - name
                 type: object
+              initProvider:
+                description: THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. InitProvider
+                  holds the same fields as ForProvider, with the exception of Identifier
+                  and other resource reference fields. The fields that are in InitProvider
+                  are merged into ForProvider when the resource is created. The same
+                  fields are also added to the terraform ignore_changes hook, to avoid
+                  updating them after creation. This is useful for fields that are
+                  required on creation, but we do not desire to update them after
+                  creation, for example because of an external controller is managing
+                  them, like an autoscaler.
+                properties:
+                  cloudflareGreEndpoint:
+                    description: The IP address assigned to the Cloudflare side of
+                      the GRE tunnel. The IP address assigned to the Cloudflare side
+                      of the GRE tunnel.
+                    type: string
+                  customerGreEndpoint:
+                    description: The IP address assigned to the customer side of the
+                      GRE tunnel. The IP address assigned to the customer side of
+                      the GRE tunnel.
+                    type: string
+                  description:
+                    description: An optional description of the GRE tunnel. Description
+                      of the GRE tunnel intent.
+                    type: string
+                  healthCheckEnabled:
+                    description: 'Specifies if ICMP tunnel health checks are enabled
+                      Default: true. Specifies if ICMP tunnel health checks are enabled.'
+                    type: boolean
+                  healthCheckTarget:
+                    description: 'The IP address of the customer endpoint that will
+                      receive tunnel health checks. Default: <customer_gre_endpoint>.
+                      The IP address of the customer endpoint that will receive tunnel
+                      health checks.'
+                    type: string
+                  healthCheckType:
+                    description: 'Specifies the ICMP echo type for the health check
+                      (request or reply) Default: reply. Specifies the ICMP echo type
+                      for the health check. Available values: `request`, `reply`.'
+                    type: string
+                  interfaceAddress:
+                    description: 31-bit prefix (/31 in CIDR notation) supporting 2
+                      hosts, one for each side of the tunnel. 31-bit prefix (/31 in
+                      CIDR notation) supporting 2 hosts, one for each side of the
+                      tunnel.
+                    type: string
+                  mtu:
+                    description: 'Maximum Transmission Unit (MTU) in bytes for the
+                      GRE tunnel. Maximum value 1476 and minimum value 576. Default:
+                      1476. Maximum Transmission Unit (MTU) in bytes for the GRE tunnel.'
+                    type: number
+                  name:
+                    description: Name of the GRE tunnel. Name of the GRE tunnel.
+                    type: string
+                  ttl:
+                    description: 'Time To Live (TTL) in number of hops of the GRE
+                      tunnel. Minimum value 64. Default: 64. Time To Live (TTL) in
+                      number of hops of the GRE tunnel.'
+                    type: number
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: 'THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. ManagementPolicies
+                  specify the array of actions Crossplane is allowed to take on the
+                  managed and external resources. This field is planned to replace
+                  the DeletionPolicy field in a future release. Currently, both could
+                  be set independently and non-default values would be honored if
+                  the feature flag is enabled. If both are custom, the DeletionPolicy
+                  field will be ignored. See the design doc for more information:
+                  https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md'
+                items:
+                  description: A ManagementAction represents an action that the Crossplane
+                    controllers can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
               providerConfigRef:
                 default:
                   name: default
@@ -337,13 +453,83 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: cloudflareGreEndpoint is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.cloudflareGreEndpoint)
+                || has(self.initProvider.cloudflareGreEndpoint)'
+            - message: customerGreEndpoint is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.customerGreEndpoint)
+                || has(self.initProvider.customerGreEndpoint)'
+            - message: interfaceAddress is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.interfaceAddress)
+                || has(self.initProvider.interfaceAddress)'
+            - message: name is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.name)
+                || has(self.initProvider.name)'
           status:
             description: GRETunnelStatus defines the observed state of GRETunnel.
             properties:
               atProvider:
                 properties:
+                  accountId:
+                    description: The ID of the account where the tunnel is being created.
+                      The account identifier to target for the resource. **Modifying
+                      this attribute will force creation of a new resource.**
+                    type: string
+                  cloudflareGreEndpoint:
+                    description: The IP address assigned to the Cloudflare side of
+                      the GRE tunnel. The IP address assigned to the Cloudflare side
+                      of the GRE tunnel.
+                    type: string
+                  customerGreEndpoint:
+                    description: The IP address assigned to the customer side of the
+                      GRE tunnel. The IP address assigned to the customer side of
+                      the GRE tunnel.
+                    type: string
+                  description:
+                    description: An optional description of the GRE tunnel. Description
+                      of the GRE tunnel intent.
+                    type: string
+                  healthCheckEnabled:
+                    description: 'Specifies if ICMP tunnel health checks are enabled
+                      Default: true. Specifies if ICMP tunnel health checks are enabled.'
+                    type: boolean
+                  healthCheckTarget:
+                    description: 'The IP address of the customer endpoint that will
+                      receive tunnel health checks. Default: <customer_gre_endpoint>.
+                      The IP address of the customer endpoint that will receive tunnel
+                      health checks.'
+                    type: string
+                  healthCheckType:
+                    description: 'Specifies the ICMP echo type for the health check
+                      (request or reply) Default: reply. Specifies the ICMP echo type
+                      for the health check. Available values: `request`, `reply`.'
+                    type: string
                   id:
                     type: string
+                  interfaceAddress:
+                    description: 31-bit prefix (/31 in CIDR notation) supporting 2
+                      hosts, one for each side of the tunnel. 31-bit prefix (/31 in
+                      CIDR notation) supporting 2 hosts, one for each side of the
+                      tunnel.
+                    type: string
+                  mtu:
+                    description: 'Maximum Transmission Unit (MTU) in bytes for the
+                      GRE tunnel. Maximum value 1476 and minimum value 576. Default:
+                      1476. Maximum Transmission Unit (MTU) in bytes for the GRE tunnel.'
+                    type: number
+                  name:
+                    description: Name of the GRE tunnel. Name of the GRE tunnel.
+                    type: string
+                  ttl:
+                    description: 'Time To Live (TTL) in number of hops of the GRE
+                      tunnel. Minimum value 64. Default: 64. Time To Live (TTL) in
+                      number of hops of the GRE tunnel.'
+                    type: number
                 type: object
               conditions:
                 description: Conditions of the resource.
@@ -386,9 +572,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

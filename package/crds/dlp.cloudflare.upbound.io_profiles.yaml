@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: profiles.dlp.cloudflare.upbound.io
 spec:
   group: dlp.cloudflare.upbound.io
@@ -54,9 +53,13 @@ spec:
             properties:
               deletionPolicy:
                 default: Delete
-                description: DeletionPolicy specifies what will happen to the underlying
+                description: 'DeletionPolicy specifies what will happen to the underlying
                   external when this managed resource is deleted - either "Delete"
-                  or "Orphan" the external resource.
+                  or "Orphan" the external resource. This field is planned to be deprecated
+                  in favor of the ManagementPolicies field in a future release. Currently,
+                  both could be set independently and non-default values would be
+                  honored if the feature flag is enabled. See the design doc for more
+                  information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223'
                 enum:
                 - Orphan
                 - Delete
@@ -140,6 +143,10 @@ spec:
                             type: string
                         type: object
                     type: object
+                  allowedMatchCount:
+                    description: Related DLP policies will trigger when the match
+                      count exceeds the number set.
+                    type: number
                   description:
                     description: Brief summary of the profile and its intended use.
                     type: string
@@ -166,12 +173,8 @@ spec:
                                 description: The validation algorithm to apply with
                                   this pattern.
                                 type: string
-                            required:
-                            - regex
                             type: object
                           type: array
-                      required:
-                      - name
                       type: object
                     type: array
                   name:
@@ -183,11 +186,90 @@ spec:
                       `predefined`. **Modifying this attribute will force creation
                       of a new resource.**'
                     type: string
-                required:
-                - entry
-                - name
-                - type
                 type: object
+              initProvider:
+                description: THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. InitProvider
+                  holds the same fields as ForProvider, with the exception of Identifier
+                  and other resource reference fields. The fields that are in InitProvider
+                  are merged into ForProvider when the resource is created. The same
+                  fields are also added to the terraform ignore_changes hook, to avoid
+                  updating them after creation. This is useful for fields that are
+                  required on creation, but we do not desire to update them after
+                  creation, for example because of an external controller is managing
+                  them, like an autoscaler.
+                properties:
+                  allowedMatchCount:
+                    description: Related DLP policies will trigger when the match
+                      count exceeds the number set.
+                    type: number
+                  description:
+                    description: Brief summary of the profile and its intended use.
+                    type: string
+                  entry:
+                    description: List of entries to apply to the profile.
+                    items:
+                      properties:
+                        enabled:
+                          description: Whether the entry is active. Defaults to `false`.
+                          type: boolean
+                        id:
+                          description: Unique entry identifier.
+                          type: string
+                        name:
+                          description: Name of the entry to deploy.
+                          type: string
+                        pattern:
+                          items:
+                            properties:
+                              regex:
+                                description: The regex that defines the pattern.
+                                type: string
+                              validation:
+                                description: The validation algorithm to apply with
+                                  this pattern.
+                                type: string
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  name:
+                    description: Name of the profile. **Modifying this attribute will
+                      force creation of a new resource.**
+                    type: string
+                  type:
+                    description: 'The type of the profile. Available values: `custom`,
+                      `predefined`. **Modifying this attribute will force creation
+                      of a new resource.**'
+                    type: string
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: 'THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. ManagementPolicies
+                  specify the array of actions Crossplane is allowed to take on the
+                  managed and external resources. This field is planned to replace
+                  the DeletionPolicy field in a future release. Currently, both could
+                  be set independently and non-default values would be honored if
+                  the feature flag is enabled. If both are custom, the DeletionPolicy
+                  field will be ignored. See the design doc for more information:
+                  https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md'
+                items:
+                  description: A ManagementAction represents an action that the Crossplane
+                    controllers can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
               providerConfigRef:
                 default:
                   name: default
@@ -359,12 +441,76 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: allowedMatchCount is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.allowedMatchCount)
+                || has(self.initProvider.allowedMatchCount)'
+            - message: entry is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.entry)
+                || has(self.initProvider.entry)'
+            - message: name is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.name)
+                || has(self.initProvider.name)'
+            - message: type is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.type)
+                || has(self.initProvider.type)'
           status:
             description: ProfileStatus defines the observed state of Profile.
             properties:
               atProvider:
                 properties:
+                  accountId:
+                    description: The account identifier to target for the resource.
+                      **Modifying this attribute will force creation of a new resource.**
+                    type: string
+                  allowedMatchCount:
+                    description: Related DLP policies will trigger when the match
+                      count exceeds the number set.
+                    type: number
+                  description:
+                    description: Brief summary of the profile and its intended use.
+                    type: string
+                  entry:
+                    description: List of entries to apply to the profile.
+                    items:
+                      properties:
+                        enabled:
+                          description: Whether the entry is active. Defaults to `false`.
+                          type: boolean
+                        id:
+                          description: Unique entry identifier.
+                          type: string
+                        name:
+                          description: Name of the entry to deploy.
+                          type: string
+                        pattern:
+                          items:
+                            properties:
+                              regex:
+                                description: The regex that defines the pattern.
+                                type: string
+                              validation:
+                                description: The validation algorithm to apply with
+                                  this pattern.
+                                type: string
+                            type: object
+                          type: array
+                      type: object
+                    type: array
                   id:
+                    type: string
+                  name:
+                    description: Name of the profile. **Modifying this attribute will
+                      force creation of a new resource.**
+                    type: string
+                  type:
+                    description: 'The type of the profile. Available values: `custom`,
+                      `predefined`. **Modifying this attribute will force creation
+                      of a new resource.**'
                     type: string
                 type: object
               conditions:
@@ -408,9 +554,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

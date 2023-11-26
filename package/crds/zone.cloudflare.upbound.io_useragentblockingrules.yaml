@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: useragentblockingrules.zone.cloudflare.upbound.io
 spec:
   group: zone.cloudflare.upbound.io
@@ -55,9 +54,13 @@ spec:
             properties:
               deletionPolicy:
                 default: Delete
-                description: DeletionPolicy specifies what will happen to the underlying
+                description: 'DeletionPolicy specifies what will happen to the underlying
                   external when this managed resource is deleted - either "Delete"
-                  or "Orphan" the external resource.
+                  or "Orphan" the external resource. This field is planned to be deprecated
+                  in favor of the ManagementPolicies field in a future release. Currently,
+                  both could be set independently and non-default values would be
+                  honored if the feature flag is enabled. See the design doc for more
+                  information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223'
                 enum:
                 - Orphan
                 - Delete
@@ -77,9 +80,6 @@ spec:
                             value will be compared to the received User-Agent HTTP
                             header value.
                           type: string
-                      required:
-                      - target
-                      - value
                       type: object
                     type: array
                   description:
@@ -169,12 +169,72 @@ spec:
                             type: string
                         type: object
                     type: object
-                required:
-                - configuration
-                - description
-                - mode
-                - paused
                 type: object
+              initProvider:
+                description: THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. InitProvider
+                  holds the same fields as ForProvider, with the exception of Identifier
+                  and other resource reference fields. The fields that are in InitProvider
+                  are merged into ForProvider when the resource is created. The same
+                  fields are also added to the terraform ignore_changes hook, to avoid
+                  updating them after creation. This is useful for fields that are
+                  required on creation, but we do not desire to update them after
+                  creation, for example because of an external controller is managing
+                  them, like an autoscaler.
+                properties:
+                  configuration:
+                    description: The configuration object for the current rule.
+                    items:
+                      properties:
+                        target:
+                          description: The configuration target for this rule. You
+                            must set the target to ua for User Agent Blocking rules.
+                          type: string
+                        value:
+                          description: The exact user agent string to match. This
+                            value will be compared to the received User-Agent HTTP
+                            header value.
+                          type: string
+                      type: object
+                    type: array
+                  description:
+                    description: An informative summary of the rule.
+                    type: string
+                  mode:
+                    description: 'The action to apply to a matched request. Available
+                      values: `block`, `challenge`, `js_challenge`, `managed_challenge`.'
+                    type: string
+                  paused:
+                    description: When true, indicates that the rule is currently paused.
+                    type: boolean
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: 'THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. ManagementPolicies
+                  specify the array of actions Crossplane is allowed to take on the
+                  managed and external resources. This field is planned to replace
+                  the DeletionPolicy field in a future release. Currently, both could
+                  be set independently and non-default values would be honored if
+                  the feature flag is enabled. If both are custom, the DeletionPolicy
+                  field will be ignored. See the design doc for more information:
+                  https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md'
+                items:
+                  description: A ManagementAction represents an action that the Crossplane
+                    controllers can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
               providerConfigRef:
                 default:
                   name: default
@@ -346,13 +406,59 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: configuration is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.configuration)
+                || has(self.initProvider.configuration)'
+            - message: description is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.description)
+                || has(self.initProvider.description)'
+            - message: mode is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.mode)
+                || has(self.initProvider.mode)'
+            - message: paused is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.paused)
+                || has(self.initProvider.paused)'
           status:
             description: UserAgentBlockingRuleStatus defines the observed state of
               UserAgentBlockingRule.
             properties:
               atProvider:
                 properties:
+                  configuration:
+                    description: The configuration object for the current rule.
+                    items:
+                      properties:
+                        target:
+                          description: The configuration target for this rule. You
+                            must set the target to ua for User Agent Blocking rules.
+                          type: string
+                        value:
+                          description: The exact user agent string to match. This
+                            value will be compared to the received User-Agent HTTP
+                            header value.
+                          type: string
+                      type: object
+                    type: array
+                  description:
+                    description: An informative summary of the rule.
+                    type: string
                   id:
+                    type: string
+                  mode:
+                    description: 'The action to apply to a matched request. Available
+                      values: `block`, `challenge`, `js_challenge`, `managed_challenge`.'
+                    type: string
+                  paused:
+                    description: When true, indicates that the rule is currently paused.
+                    type: boolean
+                  zoneId:
+                    description: The zone identifier to target for the resource. **Modifying
+                      this attribute will force creation of a new resource.**
                     type: string
                 type: object
               conditions:
@@ -396,9 +502,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

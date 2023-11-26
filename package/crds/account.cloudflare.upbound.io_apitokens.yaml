@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: apitokens.account.cloudflare.upbound.io
 spec:
   group: account.cloudflare.upbound.io
@@ -54,9 +53,13 @@ spec:
             properties:
               deletionPolicy:
                 default: Delete
-                description: DeletionPolicy specifies what will happen to the underlying
+                description: 'DeletionPolicy specifies what will happen to the underlying
                   external when this managed resource is deleted - either "Delete"
-                  or "Orphan" the external resource.
+                  or "Orphan" the external resource. This field is planned to be deprecated
+                  in favor of the ManagementPolicies field in a future release. Currently,
+                  both could be set independently and non-default values would be
+                  honored if the feature flag is enabled. See the design doc for more
+                  information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223'
                 enum:
                 - Orphan
                 - Delete
@@ -121,15 +124,109 @@ spec:
                           description: Describes what operations against which resources
                             are allowed or denied.
                           type: object
-                      required:
-                      - permissionGroups
-                      - resources
                       type: object
                     type: array
-                required:
-                - name
-                - policy
                 type: object
+              initProvider:
+                description: THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. InitProvider
+                  holds the same fields as ForProvider, with the exception of Identifier
+                  and other resource reference fields. The fields that are in InitProvider
+                  are merged into ForProvider when the resource is created. The same
+                  fields are also added to the terraform ignore_changes hook, to avoid
+                  updating them after creation. This is useful for fields that are
+                  required on creation, but we do not desire to update them after
+                  creation, for example because of an external controller is managing
+                  them, like an autoscaler.
+                properties:
+                  condition:
+                    description: Conditions under which the token should be considered
+                      valid.
+                    items:
+                      properties:
+                        requestIp:
+                          description: Request IP related conditions.
+                          items:
+                            properties:
+                              in:
+                                description: List of IP addresses or CIDR notation
+                                  where the token may be used from. If not specified,
+                                  the token will be valid for all IP addresses.
+                                items:
+                                  type: string
+                                type: array
+                              notIn:
+                                description: List of IP addresses or CIDR notation
+                                  where the token should not be used from.
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  expiresOn:
+                    description: The expiration time on or after which the token MUST
+                      NOT be accepted for processing.
+                    type: string
+                  name:
+                    description: Name of the API Token.
+                    type: string
+                  notBefore:
+                    description: The time before which the token MUST NOT be accepted
+                      for processing.
+                    type: string
+                  policy:
+                    description: Permissions policy. Multiple policy blocks can be
+                      defined.
+                    items:
+                      properties:
+                        effect:
+                          description: 'Effect of the policy. Available values: `allow`,
+                            `deny`. Defaults to `allow`.'
+                          type: string
+                        permissionGroups:
+                          description: List of permissions groups IDs. See [documentation](https://developers.cloudflare.com/api/tokens/create/permissions)
+                            for more information.
+                          items:
+                            type: string
+                          type: array
+                        resources:
+                          additionalProperties:
+                            type: string
+                          description: Describes what operations against which resources
+                            are allowed or denied.
+                          type: object
+                      type: object
+                    type: array
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: 'THIS IS AN ALPHA FIELD. Do not use it in production.
+                  It is not honored unless the relevant Crossplane feature flag is
+                  enabled, and may be changed or removed without notice. ManagementPolicies
+                  specify the array of actions Crossplane is allowed to take on the
+                  managed and external resources. This field is planned to replace
+                  the DeletionPolicy field in a future release. Currently, both could
+                  be set independently and non-default values would be honored if
+                  the feature flag is enabled. If both are custom, the DeletionPolicy
+                  field will be ignored. See the design doc for more information:
+                  https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md'
+                items:
+                  description: A ManagementAction represents an action that the Crossplane
+                    controllers can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
               providerConfigRef:
                 default:
                   name: default
@@ -301,11 +398,50 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: name is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.name)
+                || has(self.initProvider.name)'
+            - message: policy is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.policy)
+                || has(self.initProvider.policy)'
           status:
             description: APITokenStatus defines the observed state of APIToken.
             properties:
               atProvider:
                 properties:
+                  condition:
+                    description: Conditions under which the token should be considered
+                      valid.
+                    items:
+                      properties:
+                        requestIp:
+                          description: Request IP related conditions.
+                          items:
+                            properties:
+                              in:
+                                description: List of IP addresses or CIDR notation
+                                  where the token may be used from. If not specified,
+                                  the token will be valid for all IP addresses.
+                                items:
+                                  type: string
+                                type: array
+                              notIn:
+                                description: List of IP addresses or CIDR notation
+                                  where the token should not be used from.
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  expiresOn:
+                    description: The expiration time on or after which the token MUST
+                      NOT be accepted for processing.
+                    type: string
                   id:
                     type: string
                   issuedOn:
@@ -314,6 +450,36 @@ spec:
                   modifiedOn:
                     description: Timestamp of when the token was last modified.
                     type: string
+                  name:
+                    description: Name of the API Token.
+                    type: string
+                  notBefore:
+                    description: The time before which the token MUST NOT be accepted
+                      for processing.
+                    type: string
+                  policy:
+                    description: Permissions policy. Multiple policy blocks can be
+                      defined.
+                    items:
+                      properties:
+                        effect:
+                          description: 'Effect of the policy. Available values: `allow`,
+                            `deny`. Defaults to `allow`.'
+                          type: string
+                        permissionGroups:
+                          description: List of permissions groups IDs. See [documentation](https://developers.cloudflare.com/api/tokens/create/permissions)
+                            for more information.
+                          items:
+                            type: string
+                          type: array
+                        resources:
+                          additionalProperties:
+                            type: string
+                          description: Describes what operations against which resources
+                            are allowed or denied.
+                          type: object
+                      type: object
+                    type: array
                   status:
                     type: string
                 type: object
@@ -358,9 +524,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
