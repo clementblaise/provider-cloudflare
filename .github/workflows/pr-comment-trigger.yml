@@ -1,4 +1,4 @@
-ame: Run Uptest
+name: Run Uptest
 
 on:
   workflow_call:
